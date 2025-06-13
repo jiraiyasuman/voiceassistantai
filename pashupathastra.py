@@ -1,3 +1,9 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
 import os
 import webbrowser
 import pywhatkit
@@ -13,6 +19,9 @@ engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
 engine.setProperty('voice', voices[0].id)
 
+# Replace with the actual path to the ChromeDriver
+CHROMEDRIVER = "E:\APPS\chromedriver-win64"
+
 def speak(text):
     engine.say(text)
     engine.runAndWait()
@@ -23,49 +32,45 @@ def speak(audio):
     engine.runAndWait()
 
 # Function to play the song
-def play_on_youtube(song_name):
-    speak(f"Playing {song_name} on YouTube")
-    pywhatkit.playonyt(song_name)
+def play_song_on_youtube(song_name):
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver.get("https://www.youtube.com")
 
-# Control YouTube using keyboard
-def youtube_control(action):
-    key_map = {
-        "pause": "space",
-        "resume": "space",
-        "stop": "w",  # no native 'stop', but you can close tab if you want
-        "mute": "m",
-        "fullscreen": "f"
-    }
-    key = key_map.get(action)
-    if key:
-        pyautogui.press(key)
-        speak(f"{action.capitalize()} command executed.")
-    elif action == "exit":
-        speak("Exiting the assistant.")
-    else:
-        speak("Unknown command.")
+    # Wait for the page to load
+    time.sleep(2)
+
+    search_box = driver.find_element(By.NAME, "search_query")
+    search_box.send_keys(song_name)
+    search_box.submit()
+
+    try:
+        # Wait and play first video
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.ID, "video-title"))
+            )
+            first_video = driver.find_elements(By.ID, "video-title")[0]
+            first_video.click()
+
+    except Exception as e:
+            print(" Error playing video:", e)
 
 # Function to take voice input
 def listen_command():
     recognizer = sr.Recognizer()
     with sr.Microphone() as source:
-        print("🎤 Listening for a song name...")
-        speak("Which song would you like to play on YouTube?")
-        recognizer.adjust_for_ambient_noise(source)
+        speak("What song do you like to play, Sir?")
+        print(" Say the song name to play on YouTube...")
         audio = recognizer.listen(source)
-
-        try:
-            command = recognizer.recognize_google(audio)
-            print(f" You said: {command}")
-            return command
-        except sr.UnknownValueError:
-            print(" Sorry, I couldn't understand.")
-            speak("Sorry, I couldn't understand.")
-            return None
-        except sr.RequestError:
-            print(" Could not request results.")
-            speak("Network error.")
-            return None
+    try:
+        command = recognizer.recognize_google(audio)
+        print(f" You said: {command}")
+        return command
+    except sr.UnknownValueError:
+        print(" Could not understand audio.")
+        return None
+    except sr.RequestError as e:
+        print(f" Could not request results; {e}")
+        return None
 
 # Voice command capture
 def takeCommand():
@@ -77,11 +82,11 @@ def takeCommand():
             audio = r.listen(source, timeout=3, phrase_time_limit=5)
     except sr.WaitTimeoutError:
         print("Listening timed out.")
-        speak("Sorry, I didn't hear anything.")
+
         return "none"
     except Exception as e:
         print(f"Microphone error: {e}")
-        speak("Microphone is not working correctly.")
+
         return "none"
 
     try:
@@ -90,10 +95,10 @@ def takeCommand():
         print(f"User said: {query}")
         return query
     except sr.UnknownValueError:
-        speak("Sorry, I could not understand that.")
+
         return "none"
     except sr.RequestError:
-        speak("Sorry, the speech service is unavailable.")
+
         return "none"
 #date-time module
 def wish():
@@ -120,12 +125,17 @@ def listen_and_type():
                 audio = recognizer.listen(source, timeout=5)
                 command = recognizer.recognize_google(audio).lower()
                 print(f"You said: {command}")
-
                 if "stop typing" in command:
                     print("Stopping typing.")
                     break
-                else:
+                elif "change line" in command:
                     pyautogui.typewrite(command + '\n')
+                elif "space" in command:
+                    pyautogui.typewrite(" ")
+                elif "main menu" in command:
+                    return
+                else:
+                    pyautogui.typewrite(command + ' ')
             except sr.WaitTimeoutError:
                 print("No speech detected. Retrying...")
             except sr.UnknownValueError:
@@ -138,7 +148,6 @@ if __name__ == "__main__":
     wish()
     speak("This is your personal voice assistant AI, Pashupathasthra. How can I help you?")
     while True:
-
         query = takeCommand().lower()
         # logic building for tasks
         if "open notepad" in query:
@@ -149,27 +158,13 @@ if __name__ == "__main__":
         elif "open spring" in query:
             npath = "E:\\APPS\\sts-4.27.0.RELEASE\\SpringToolSuite4.exe"
             os.startfile(npath)
-        elif "open command prompt" in query:
+        elif "cmd" in query:
             os.system("start cmd")
         elif "open spotify" in query:
             npath = "C:\\Users\\SUMAN\\AppData\\Roaming\\Spotify\\Spotify.exe"
             os.startfile(npath)
         elif "open youtube" in query:
-            #webbrowser.open("https://www.youtube.com")
-            speak("What song do you like to play, Sir?")
-            song = listen_command()
-            if song:
-                play_on_youtube(song)
-                while True:
-                    command = listen_command("You can say pause, resume, mute, fullscreen or exit.")
-                    if "pause" in command:
-                        youtube_control("pause")
-                    elif "resume" in command:
-                        youtube_control("resume")
-                    elif "mute" in command:
-                        youtube_control("mute")
-                    elif "fullscreen" in command:
-                        youtube_control("fullscreen")
-                    elif "exit" in command or "stop" in command:
-                        speak("Stopping YouTube control. Goodbye!")
-                        break
+            command = listen_command()
+            if command:
+                play_song_on_youtube(command)
+         
