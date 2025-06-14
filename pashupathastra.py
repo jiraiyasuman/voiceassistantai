@@ -1,10 +1,17 @@
+from logging.config import listen
+
+from pyparsing import original_text_for
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from sqlalchemy.util import await_only
 from webdriver_manager.chrome import ChromeDriverManager
 import os
+import requests
+import geocoder
+import asyncio
 import webbrowser
 import pywhatkit
 import pyttsx3
@@ -14,6 +21,11 @@ import datetime
 import time
 import pyautogui
 from requests import get
+from googletrans import Translator
+from gtts import gTTS
+import playsound
+import os
+import uuid
 # Initialize the TTS engine
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
@@ -86,9 +98,7 @@ def takeCommand():
         return "none"
     except Exception as e:
         print(f"Microphone error: {e}")
-
         return "none"
-
     try:
         print("Recognizing...")
         query = r.recognize_google(audio, language='en-in')
@@ -100,6 +110,25 @@ def takeCommand():
     except sr.RequestError:
 
         return "none"
+recognizer = sr.Recognizer()
+translator = Translator()
+engine = pyttsx3.init()
+
+def listen_and_detect():
+
+    with sr.Microphone() as source:
+        print("Listening.......")
+        audio = recognizer.listen(source)
+        try:
+            print("Recognizing........")
+            query = recognizer.recognize_google(audio)
+            print("You said", query)
+            return query
+        except sr.UnknownValueError:
+            print("Sorry, I could not understand the audio")
+        except sr.RequestError:
+            print("Could not request results")
+        return None
 #date-time module
 def wish():
     hour = int(datetime.datetime.now().hour)
@@ -111,6 +140,104 @@ def wish():
         speak("Good Evening Sir!")
     else:
         speak("Good Night Sir!")
+# listen and translate
+async def listen_and_translate():
+    while True:
+        print("\n---- Main Menu ----")
+        speak("Say something to translate or say 'main menu' to go back")
+        query = listen_and_detect()
+        if query:
+            if "main menu" in query.lower() or "exit" in query.lower() or "go back" in query.lower():
+                speak("Returning to the main menu")
+                print("Returning to the main menu")
+                break
+            else:
+               await detect_and_translate(query)
+# Fetch user Location
+def get_user_location():
+    try:
+        res = requests.get("https://ipinfo.io")
+        data = res.json()
+        city = data.get("city", "Unknown")
+        latitude, longitude = data.get("loc", "0,0").split(",")
+        return city, latitude, longitude
+    except Exception as e:
+        print("Failed to get location:", e)
+        speak("I couldn't determine your location.")
+        return "Unknown", "0", "0"
+#Get weather command
+def weather_listen():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Listening...")
+        speak("Please say something...")
+        recognizer.adjust_for_ambient_noise(source)
+        try:
+            audio = recognizer.listen(source, timeout=5, phrase_time_limit=8)
+            print("Recognizing...")
+            command = recognizer.recognize_google(audio)
+            print(f"You said: {command}")
+            return command.lower()
+        except sr.WaitTimeoutError:
+            print("Listening timed out.")
+            speak("Sorry, I couldn't hear you. Please try again.")
+        except sr.UnknownValueError:
+            print("Could not understand audio.")
+            speak("I didn't catch that. Could you repeat?")
+        except sr.RequestError as e:
+            print(f"Error: {e}")
+            speak("There was an error with the voice service.")
+        return None
+# Get the weather of the location
+def get_weather(city):
+    api = "b5df6ce959c52f1149f64772a4120899"
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    try:
+        params = {"q":city,"appid":api,"units":"metric"}
+        response = requests.get(BASE_URL,params=params)
+        data = response.json()
+
+        if response.status_code == 200:
+            weather_description = data["weather"][0]["description"]
+            temp = data["main"]["temp"]
+            humidity = data["main"]["humidity"]
+            wind_speed = data["wind"]["speed"]
+
+            weather_report = (f"The current weather in {city} is {weather_description}. "
+                              f"The temperature is {temp} degrees Celsius with a humidity of {humidity}% "
+                              f"and wind speed of {wind_speed} meters per second.")
+            return weather_report
+        else:
+            return f"Could not fetch the weather report"
+    except Exception as e:
+        print("Error fetching details ",e)
+        return "Sorry, I could not fetch the details"
+
+# Get weather prediction
+def weather_detection():
+    speak("Do you want to know the today's weather?")
+    print("Do you want to know the today's weather?")
+    command = weather_listen()
+    if command and "yes" in command:
+        city,latitude,longitude = get_user_location()
+        speak(f"Fetching weather information for {city}.")
+        weather_report = get_weather(city)
+        print(weather_report)
+        speak(weather_report)
+    elif "main menu" in command:
+        return ""
+    else:
+        print("Okay let me know if you want something else")
+# Translation
+async def detect_and_translate(text):
+    detected = await translator.detect(text)
+    lang_code = detected.lang
+    print(f"Detected language:{lang_code}")
+
+    # Translate to Indian english
+    translation =await translator.translate(text,src = lang_code,dest='en')
+    print(f"Translated:{translation.text}")
+    speak(f"{translation.text}")
 
 # write to notepad
 def listen_and_type():
@@ -167,4 +294,7 @@ if __name__ == "__main__":
             command = listen_command()
             if command:
                 play_song_on_youtube(command)
-         
+        elif "open translator" in query:
+            asyncio.run(listen_and_translate())
+        elif "open weather" in query:
+            weather_detection()
