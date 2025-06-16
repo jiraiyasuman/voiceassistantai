@@ -1,14 +1,22 @@
+import subprocess
+import pandas as panda
+from ipaddress import ip_address
 from logging.config import listen
+import wikipedia
 
 from pyparsing import original_text_for
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from sqlalchemy.util import await_only
+from pyspark.sql import SparkSession
 from webdriver_manager.chrome import ChromeDriverManager
 import os
+import pyarrow
+import socket
 import requests
 import geocoder
 import asyncio
@@ -26,6 +34,9 @@ from gtts import gTTS
 import playsound
 import os
 import uuid
+
+from wikipedia import summary
+
 # Initialize the TTS engine
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
@@ -33,6 +44,12 @@ engine.setProperty('voice', voices[0].id)
 
 # Replace with the actual path to the ChromeDriver
 CHROMEDRIVER = "E:\APPS\chromedriver-win64"
+
+MOVIE_FOLDER_NAME = "F:\\Movies"
+
+MOVIE_SUPPORTED_EXTENSIONS = ['.mp4','.mkv','.avi','.mov']
+
+VLC_PATH = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VideoLAN\\VLC\vlc.exe"
 
 def speak(text):
     engine.say(text)
@@ -238,7 +255,77 @@ async def detect_and_translate(text):
     translation =await translator.translate(text,src = lang_code,dest='en')
     print(f"Translated:{translation.text}")
     speak(f"{translation.text}")
+# Wikipedia
+def listen_wikipedia_command():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        speak("Sir, what do you like to search on wikipedia?")
+        print("Listening for topic......")
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source)
+    try:
+        command = recognizer.recognize_google(audio)
+        print(f"You said:{command}")
+        return command
+    except sr.UnknownValueError:
+        print("Sorry, I could not understand that")
+        return command
+    except sr.UnknownValueError:
+        print("There was a problem connecting to the speech service")
+        return None
+# Listen google Command
+def listen_google_command():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        speak("What do you want to search for the day,Sir?")
+        print("Listening........")
+        audio = recognizer.listen(source)
+    try:
+        command = recognizer.recognize_google()
+        print(f"You said:{command}")
+        return command
+    except sr.UnknownValueError:
+        print("Sorry. I didn't understand understand what you said")
+        return None
+    except sr.RequestError:
+        print("Cannot request result")
+        return  None
 
+
+# search in google
+def search_google():
+    command = listen_google_command()
+    if command:
+        speak(f"Searching in google")
+        pywhatkit.search(command)
+# WikiPedia Search Command by Voice Command
+def search_wikipedia_info(query):
+    try:
+        query = query.replace("wikipedia","")
+        summary = wikipedia.summary(query)
+        return summary
+    except wikipedia.exceptions.DisambiguationError as e:
+        return f"Your query is too vague. Try one of these: {e.options[:5]}"
+    except wikipedia.exceptions.PageError:
+        return "Sorry! I couldn't find any results on the query"
+    except Exception as e:
+        return f"Ann error has occurred: {str(e)}"
+EMAIL = "9875441655"
+PASSWORD = "Suman@Talukdar"
+# open facebook
+def login_facebook():
+    speak("Opening your facebook and logging into your profile now...")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+    driver.get("https://www.facebook.com")
+    time.sleep(2)
+    email_input = driver.find_element(By.ID,"email")
+    password_input = driver.find_element(By.ID,"pass")
+    login_button = driver.find_element(By.NAME,"login")
+
+    email_input.send_keys(EMAIL)
+    password_input.send_keys(PASSWORD)
+    login_button.click()
+    speak("You are now logged into facebook")
 # write to notepad
 def listen_and_type():
     recognizer = sr.Recognizer()
@@ -298,3 +385,36 @@ if __name__ == "__main__":
             asyncio.run(listen_and_translate())
         elif "open weather" in query:
             weather_detection()
+        elif "open ip address" in query:
+            try:
+                hostname = socket.gethostname()
+                ip = socket.gethostbyname(hostname)
+                speak(f"Your Ip address is {ip}")
+            except Exception as e:
+                print("Error",e)
+        elif "open word" in query:
+            npath = "C:\\Program Files (x86)\\Microsoft Office\\Office14\\WINWORD.exe"
+            os.startfile(npath)
+            speak("Writing to Microsoft Word .........Please sir, will you instruct me what to write in the notepad")
+            listen_and_type()
+        elif "open powerpoint" in query:
+            npath = "C:\\Program Files (x86)\\Microsoft Office\\Office14\\POWERPNT.exe"
+            os.startfile(npath)
+        elif "open excel" in query:
+            npath =  "C:\\Program Files (x86)\\Microsoft Office\\Office14\\EXCEL.exe"
+            os.startfile(npath)
+        elif "open wikipedia" in query:
+            topic = listen_wikipedia_command()
+            if topic:
+                result = search_wikipedia_info(topic)
+                speak(f"According to wikipedia, {result}")
+        elif "open facebook" in query:
+            login_facebook()
+        elif "open instagram" in query:
+            webbrowser.get("https://www.instagram.com/suman.talukdar53/")
+        elif "open linkedin" in query:
+            webbrowser.get("https://www.linkedin.com/in/suman-talukdar-29b3352b6")
+        elif "open github" in query:
+            webbrowser.get("https://github.com/jiraiyasuman")
+        elif "open google" in query:
+            search_google()
