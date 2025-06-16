@@ -310,8 +310,8 @@ def search_wikipedia_info(query):
         return "Sorry! I couldn't find any results on the query"
     except Exception as e:
         return f"Ann error has occurred: {str(e)}"
-EMAIL = "9875441655"
-PASSWORD = "Suman@Talukdar"
+EMAIL = "#######"
+PASSWORD = "#######"
 # open facebook
 def login_facebook():
     speak("Opening your facebook and logging into your profile now...")
