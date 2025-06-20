@@ -343,31 +343,6 @@ def listen_command_news():
             print("Sorry! I did not understand that")
         except sr.RequestError:
             print("Network error")
-# gTTS to speak
-def chat_speak(text):
-    print(":",text)
-    tts = gTTS(text=text,lang='en')
-    filename = f"temp_{uuid.uuid4()}.mp3"
-    tts.save(filename)
-    playsound(filename)
-    os.remove(filename)
-# Listen to chat voice
-def listen_chat():
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening......")
-        recognizer.adjust_for_ambient_noise(source)
-        audio = recognizer.listen(source)
-    try:
-        query = recognizer.recognize_google(audio)
-        print("You",query)
-        return query.lower()
-    except sr.UnknownValueError:
-        print("Sorry, I cannot understand")
-        return ""
-    except sr.RequestError:
-        print("Speech recognition service is down")
-        return ""
 # Generate AI-supported response
 def generate_repsonse(prompt,conversation_history):
     conversation_history.append({"role": "user", "content": prompt})
@@ -462,32 +437,13 @@ def listen_and_type():
             except sr.RequestError as e:
                 print(f"Could not request results; {e}")
                 break
-ai_client = OpenAI(api_key="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")
+ai_client = OpenAI(api_key=apikey)
 #Voice chat friend
 chat_query_from_user = ""
 chat_query_from_user = [
         {"role": "system", "content": "You are a helpful assistant named Pashupathashtra."}]
 
-def voice_chat(query):
-        chat_query_from_user.append({"role": "user", "content": query})
 
-        response = ai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=chat_query_from_user,
-            temperature=0.7,
-            max_tokens=256,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
-
-        reply = response.choices[0].message.content.strip()
-        chat_query_from_user.append({"role": "assistant", "content": reply})
-
-        say(reply)
-        speak(reply)
-def say(text):
-    os.system(f'say"{text}"')
 # Main program
 if __name__ == "__main__":
     wish()
@@ -553,8 +509,5 @@ if __name__ == "__main__":
             webbrowser.open("https://libgen.gs/")
         elif "open developer doc" in query:
             webbrowser.open("https://devdocs.io/")
-        elif "open voice chat" in query:
-            query = listen_chat()
-            voice_chat(query)
         elif "open email" in query:
             voice_email_details()
