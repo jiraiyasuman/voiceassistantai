@@ -1,11 +1,15 @@
+import json
+import smtplib
 import subprocess
+from http.client import responses
+from config import apikey
+import openai as OPENAI
+from openai import OpenAI
 import pandas as panda
 from ipaddress import ip_address
 from logging.config import listen
 import wikipedia
-
 from pyparsing import original_text_for
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -34,9 +38,14 @@ from gtts import gTTS
 import playsound
 import os
 import uuid
-
+import smtplib
 from wikipedia import summary
 
+
+# Email config
+SENDER_EMAIL = "suman.talukdar53@gmail.com"
+RECEIVER_EMAIL = "suman.talukdar92@gmail.com"
+SENDER_PASSWORD = "########"
 # Initialize the TTS engine
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
@@ -44,12 +53,6 @@ engine.setProperty('voice', voices[0].id)
 
 # Replace with the actual path to the ChromeDriver
 CHROMEDRIVER = "E:\APPS\chromedriver-win64"
-
-MOVIE_FOLDER_NAME = "F:\\Movies"
-
-MOVIE_SUPPORTED_EXTENSIONS = ['.mp4','.mkv','.avi','.mov']
-
-VLC_PATH = r"C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\VideoLAN\\VLC\vlc.exe"
 
 def speak(text):
     engine.say(text)
@@ -281,7 +284,7 @@ def listen_google_command():
         print("Listening........")
         audio = recognizer.listen(source)
     try:
-        command = recognizer.recognize_google()
+        command = recognizer.recognize_google(audio)
         print(f"You said:{command}")
         return command
     except sr.UnknownValueError:
@@ -296,8 +299,9 @@ def listen_google_command():
 def search_google():
     command = listen_google_command()
     if command:
-        speak(f"Searching in google")
-        pywhatkit.search(command)
+        speak(f"Searching in google {command}")
+        url = f"https://www.google.com/search?q={command.replace(' ', '+')}"
+        webbrowser.open(url)
 # WikiPedia Search Command by Voice Command
 def search_wikipedia_info(query):
     try:
@@ -310,8 +314,8 @@ def search_wikipedia_info(query):
         return "Sorry! I couldn't find any results on the query"
     except Exception as e:
         return f"Ann error has occurred: {str(e)}"
-EMAIL = "#######"
-PASSWORD = "#######"
+EMAIL = "9875441655"
+PASSWORD = "Suman@Talukdar"
 # open facebook
 def login_facebook():
     speak("Opening your facebook and logging into your profile now...")
@@ -326,7 +330,108 @@ def login_facebook():
     password_input.send_keys(PASSWORD)
     login_button.click()
     speak("You are now logged into facebook")
-# write to notepad
+# listen to get news
+def listen_command_news():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        speak("Sir.....What kind of news do you want to hear today?")
+        audio = recognizer.listen(source)
+        try:
+            command = recognizer.recognize_google(audio)
+            return command.lower()
+        except sr.UnknownValueError:
+            print("Sorry! I did not understand that")
+        except sr.RequestError:
+            print("Network error")
+# gTTS to speak
+def chat_speak(text):
+    print(":",text)
+    tts = gTTS(text=text,lang='en')
+    filename = f"temp_{uuid.uuid4()}.mp3"
+    tts.save(filename)
+    playsound(filename)
+    os.remove(filename)
+# Listen to chat voice
+def listen_chat():
+    recognizer = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("Listening......")
+        recognizer.adjust_for_ambient_noise(source)
+        audio = recognizer.listen(source)
+    try:
+        query = recognizer.recognize_google(audio)
+        print("You",query)
+        return query.lower()
+    except sr.UnknownValueError:
+        print("Sorry, I cannot understand")
+        return ""
+    except sr.RequestError:
+        print("Speech recognition service is down")
+        return ""
+# Generate AI-supported response
+def generate_repsonse(prompt,conversation_history):
+    conversation_history.append({"role": "user", "content": prompt})
+    try :
+        response = OPENAI.ChatCompletion.create(
+            model = "gpt-3.5-turbo",
+                    messages = conversation_history
+        )
+        message = response['choice'][0]['message']['content']
+        conversation_history.append({"role":"assistant","content":message})
+        return message,conversation_history
+    except Exception as e:
+        print(f"Error: {e}")
+        return ""
+# Listen to auto email commands
+def listen_email():
+    r = sr.Recognizer()
+    with sr.Microphone() as source:
+        print("🎙️ Listening...")
+        r.adjust_for_ambient_noise(source)
+        audio = r.listen(source)
+    try:
+        command = r.recognize_google(audio)
+        print(f"You said: {command}")
+        return command
+    except sr.UnknownValueError:
+        speak("Sorry, I didn't catch that.")
+        return None
+# Getting details of the email
+def voice_email_details():
+    speak("Do you want to open Gmail?")
+    command = listen_email()
+    if command and "yes" in command.lower():
+        webbrowser.open("https://mail.google.com")
+        speak("Opening Gmail...")
+
+    speak("To whom should I send the email?")
+    to_email = listen()
+
+    speak("What is the subject of your email?")
+    subject = listen()
+
+    speak("What should I say in the email?")
+    body = listen()
+
+    if to_email and subject and body:
+        send_email(to_email, subject, body)
+def send_email(to_email, subject, body):
+    sender_email = "suman.talukdar53@gmail.com"
+    sender_password = "#######"  # App password, not your main Gmail password
+
+    message = f"Subject: {subject}\n\n{body}"
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, to_email, message)
+        server.quit()
+        speak("Email has been sent successfully.")
+    except Exception as e:
+        speak("Sorry, I was unable to send the email.")
+        print(e)
+
+
 def listen_and_type():
     recognizer = sr.Recognizer()
     mic = sr.Microphone()
@@ -357,6 +462,32 @@ def listen_and_type():
             except sr.RequestError as e:
                 print(f"Could not request results; {e}")
                 break
+ai_client = OpenAI(api_key="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")
+#Voice chat friend
+chat_query_from_user = ""
+chat_query_from_user = [
+        {"role": "system", "content": "You are a helpful assistant named Pashupathashtra."}]
+
+def voice_chat(query):
+        chat_query_from_user.append({"role": "user", "content": query})
+
+        response = ai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=chat_query_from_user,
+            temperature=0.7,
+            max_tokens=256,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
+
+        reply = response.choices[0].message.content.strip()
+        chat_query_from_user.append({"role": "assistant", "content": reply})
+
+        say(reply)
+        speak(reply)
+def say(text):
+    os.system(f'say"{text}"')
 # Main program
 if __name__ == "__main__":
     wish()
@@ -411,10 +542,19 @@ if __name__ == "__main__":
         elif "open facebook" in query:
             login_facebook()
         elif "open instagram" in query:
-            webbrowser.get("https://www.instagram.com/suman.talukdar53/")
+            webbrowser.open("https://www.instagram.com/suman.talukdar53/")
         elif "open linkedin" in query:
-            webbrowser.get("https://www.linkedin.com/in/suman-talukdar-29b3352b6")
+            webbrowser.open("https://www.linkedin.com/in/suman-talukdar-29b3352b6")
         elif "open github" in query:
-            webbrowser.get("https://github.com/jiraiyasuman")
+            webbrowser.open("https://github.com/jiraiyasuman")
         elif "open google" in query:
             search_google()
+        elif "open library genesis" in query:
+            webbrowser.open("https://libgen.gs/")
+        elif "open developer doc" in query:
+            webbrowser.open("https://devdocs.io/")
+        elif "open voice chat" in query:
+            query = listen_chat()
+            voice_chat(query)
+        elif "open email" in query:
+            voice_email_details()
