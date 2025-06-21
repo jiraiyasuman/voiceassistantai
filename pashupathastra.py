@@ -45,7 +45,7 @@ from wikipedia import summary
 # Email config
 SENDER_EMAIL = "suman.talukdar53@gmail.com"
 RECEIVER_EMAIL = "suman.talukdar92@gmail.com"
-SENDER_PASSWORD = "########"
+SENDER_PASSWORD = "zjvq idph sybe ftxb"
 # Initialize the TTS engine
 engine = pyttsx3.init('sapi5')
 voices = engine.getProperty('voices')
@@ -392,7 +392,7 @@ def voice_email_details():
         send_email(to_email, subject, body)
 def send_email(to_email, subject, body):
     sender_email = "suman.talukdar53@gmail.com"
-    sender_password = "#######"  # App password, not your main Gmail password
+    sender_password = "zjvq idph sybe ftxb"  # App password, not your main Gmail password
 
     message = f"Subject: {subject}\n\n{body}"
     try:
